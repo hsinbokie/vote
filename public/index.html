@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>迷你 Kahoot 投票遊戲</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background-color: #f2f2f2; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .hidden { display: none; }
+        button { padding: 10px 20px; font-size: 16px; margin: 10px; cursor: pointer; border: none; border-radius: 5px; background-color: #4CAF50; color: white; }
+        button:hover { background-color: #45a049; }
+        .option-btn { display: block; width: 100%; margin: 10px 0; background-color: #2196F3; font-size: 18px; padding: 15px; }
+        input { padding: 10px; font-size: 16px; width: 80%; margin-bottom: 20px; }
+        #results { margin-top: 20px; text-align: left; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="loginSection">
+        <h2>加入遊戲</h2>
+        <input type="text" id="usernameInput" placeholder="請輸入你的暱稱">
+        <button onclick="joinGame()">進入房間</button>
+    </div>
+
+    <div id="gameSection" class="hidden">
+        <p>目前線上人數: <span id="playerCount">0</span></p>
+        <h2 id="questionTitle">等待題目中...</h2>
+        <div id="optionsContainer">
+            </div>
+
+        <div id="results">
+            <h3>即時投票結果：</h3>
+            <p>A: <span id="resA">0</span> 票</p>
+            <p>B: <span id="resB">0</span> 票</p>
+            <p>C: <span id="resC">0</span> 票</p>
+            <p>D: <span id="resD">0</span> 票</p>
+        </div>
+    </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const socket = io();
+
+    // 登入遊戲
+    function joinGame() {
+        const username = document.getElementById('usernameInput').value;
+        if (username.trim() === '') {
+            alert('請輸入暱稱！');
+            return;
+        }
+        socket.emit('joinGame', username);
+        
+        // 切換畫面
+        document.getElementById('loginSection').style.display = 'none';
+        document.getElementById('gameSection').style.display = 'block';
+    }
+
+    // 接收題目
+    socket.on('loadQuestion', (question) => {
+        document.getElementById('questionTitle').innerText = question.title;
+        const container = document.getElementById('optionsContainer');
+        container.innerHTML = ''; 
+        
+        // 產生 A, B, C, D 按鈕
+        for (const [key, value] of Object.entries(question.options)) {
+            const btn = document.createElement('button');
+            btn.className = 'option-btn';
+            btn.innerText = `${key}: ${value}`;
+            btn.onclick = () => {
+                socket.emit('submitVote', key);
+                // 投完票後將所有按鈕設為不可點擊
+                document.querySelectorAll('.option-btn').forEach(b => b.disabled = true);
+                btn.innerText += ' (已選擇)';
+            };
+            container.appendChild(btn);
+        }
+    });
+
+    // 更新線上人數
+    socket.on('updatePlayers', (count) => {
+        document.getElementById('playerCount').innerText = count;
+    });
+
+    // 即時更新結果票數
+    socket.on('updateResults', (votes) => {
+        document.getElementById('resA').innerText = votes.A;
+        document.getElementById('resB').innerText = votes.B;
+        document.getElementById('resC').innerText = votes.C;
+        document.getElementById('resD').innerText = votes.D;
+    });
+</script>
+
+</body>
+</html>
