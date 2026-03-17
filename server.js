@@ -1,4 +1,3 @@
-// server.js
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -7,55 +6,80 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// 設定靜態檔案資料夾 (用來放 HTML/CSS/JS)
 app.use(express.static('public'));
 
-// 遊戲狀態 (記憶體暫存)
 let players = {};
-let votes = { A: 0, B: 0, C: 0, D: 0 };
+let isQuestionActive = false; // 控制現在是否可以投票
+let timeLeft = 15; // 每題 15 秒
+let timer;
+
+// 設定題目與正確答案
 let currentQuestion = {
-    title: "請問台灣最高的山是哪一座？",
-    options: { A: "陽明山", B: "阿里山", C: "玉山", D: "雪山" }
+    title: "請問奇洋與彥翎的婚宴辦在哪一間飯店？",
+    options: { A: "君悅酒店", B: "W Hotel", C: "君品酒店", D: "萬豪酒店" },
+    answer: "C" // 正確答案
 };
 
 io.on('connection', (socket) => {
-    console.log('有使用者連線:', socket.id);
-
-    // 處理使用者登入/加入遊戲
+    // 玩家加入
     socket.on('joinGame', (username) => {
-        players[socket.id] = { name: username, hasVoted: false };
-        console.log(`${username} 加入了遊戲`);
-        
-        // 傳送當前題目給該玩家
-        socket.emit('loadQuestion', currentQuestion);
-        // 廣播給所有人更新玩家人數
+        players[socket.id] = { name: username, score: 0, hasVoted: false };
         io.emit('updatePlayers', Object.keys(players).length);
+        socket.emit('loadQuestion', currentQuestion);
     });
 
-    // 處理投票
+    // 任何人都可以點擊「開始遊戲」觸發計時
+    socket.on('startGame', () => {
+        if (isQuestionActive) return;
+        
+        isQuestionActive = true;
+        timeLeft = 15;
+        
+        // 重置所有人的投票狀態
+        for (let id in players) players[id].hasVoted = false;
+        
+        io.emit('gameStarted'); // 通知前端遊戲開始
+
+        // 開始倒數計時
+        timer = setInterval(() => {
+            timeLeft--;
+            io.emit('timerUpdate', timeLeft);
+
+            if (timeLeft <= 0) {
+                clearInterval(timer);
+                isQuestionActive = false;
+                
+                // 時間到，計算排名並廣播結果
+                let ranking = Object.values(players)
+                    .sort((a, b) => b.score - a.score) // 分數高的在前面
+                    .slice(0, 5); // 只取前 5 名
+                
+                io.emit('showResults', { answer: currentQuestion.answer, ranking: ranking });
+            }
+        }, 1000);
+    });
+
+    // 處理投票與計分
     socket.on('submitVote', (option) => {
-        if (players[socket.id] && !players[socket.id].hasVoted) {
-            votes[option]++;
-            players[socket.id].hasVoted = true;
-            console.log(`${players[socket.id].name} 投給了 ${option}`);
+        let player = players[socket.id];
+        if (player && isQuestionActive && !player.hasVoted) {
+            player.hasVoted = true;
             
-            // 即時廣播最新票數給所有人
-            io.emit('updateResults', votes);
+            // 如果答對了，根據剩餘時間給分 (越快分數越高)
+            if (option === currentQuestion.answer) {
+                let timeBonus = timeLeft * 10; // 每剩1秒多10分
+                player.score += (100 + timeBonus); // 基礎分 100 + 速度加成
+            }
         }
     });
 
-    // 處理斷線
     socket.on('disconnect', () => {
-        if (players[socket.id]) {
-            console.log(`${players[socket.id].name} 離開了遊戲`);
-            delete players[socket.id];
-            io.emit('updatePlayers', Object.keys(players).length);
-        }
+        delete players[socket.id];
+        io.emit('updatePlayers', Object.keys(players).length);
     });
 });
 
 const PORT = process.env.PORT || 3000;
-
 server.listen(PORT, () => {
     console.log(`伺服器已啟動，監聽 Port: ${PORT}`);
 });
