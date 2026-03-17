@@ -27,46 +27,47 @@ io.on('connection', (socket) => {
         io.emit('updatePlayers', Object.keys(players).length);
         socket.emit('waitingForHost'); // 告訴玩家等待主持人出題
     });
-
-    // 主持人發送下一題
+// === 替換成這個全新的出題與計時邏輯 ===
     socket.on('nextQuestion', () => {
+        // 如果還在倒數中，避免主持人不小心連按
+        if (isQuestionActive) return; 
+
         if (currentQuestionIndex < questions.length) {
             let q = questions[currentQuestionIndex];
+            
+            // 進入答題狀態，設定為 5 秒
+            isQuestionActive = true;
+            timeLeft = 5; 
+            for (let id in players) players[id].hasVoted = false;
+
+            // 同時發送題目給大螢幕，並通知所有人「遊戲開始」
             io.emit('loadQuestion', { title: q.title, options: q.options });
+            io.emit('gameStarted'); 
+
+            // 啟動 5 秒倒數計時器
+            timer = setInterval(() => {
+                timeLeft--;
+                io.emit('timerUpdate', timeLeft);
+
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    isQuestionActive = false;
+                    
+                    // 時間到，計算排名並廣播結果
+                    let ranking = Object.values(players)
+                        .sort((a, b) => b.score - a.score)
+                        .slice(0, 5); 
+                    
+                    io.emit('showResults', { answer: q.answer, ranking: ranking });
+                    currentQuestionIndex++; // 準備進入下一題
+                }
+            }, 1000);
         } else {
-            io.emit('gameOver'); // 題目沒了，遊戲結束
+            io.emit('gameOver'); // 題目沒了
         }
     });
-
-    // 主持人按下開始計時
-    socket.on('startGame', () => {
-        if (isQuestionActive || currentQuestionIndex >= questions.length) return;
-        
-        isQuestionActive = true;
-        timeLeft = 15;
-        for (let id in players) players[id].hasVoted = false;
-        
-        io.emit('gameStarted');
-
-        timer = setInterval(() => {
-            timeLeft--;
-            io.emit('timerUpdate', timeLeft);
-
-            if (timeLeft <= 0) {
-                clearInterval(timer);
-                isQuestionActive = false;
-                
-                let q = questions[currentQuestionIndex];
-                let ranking = Object.values(players)
-                    .sort((a, b) => b.score - a.score)
-                    .slice(0, 5); // 取前五名
-                
-                io.emit('showResults', { answer: q.answer, ranking: ranking });
-                currentQuestionIndex++; // 準備進入下一題
-            }
-        }, 1000);
-    });
-
+    // ============================
+  
     // 玩家投票
     socket.on('submitVote', (option) => {
         let player = players[socket.id];
