@@ -22,7 +22,10 @@
     
     <button class="control-btn" onclick="socket.emit('nextQuestion')">顯示下一題</button>
     <button class="control-btn" onclick="socket.emit('startGame')" style="background-color: #ff9800;">開始計時搶答！</button>
-
+    <button class="control-btn" onclick="socket.emit('nextQuestion')">顯示下一題</button>
+    <button class="control-btn" onclick="socket.emit('startGame')" style="background-color: #ff9800;">開始計時搶答！</button>
+    
+    <button class="control-btn" onclick="resetGame()" style="background-color: #f44336;">重置遊戲</button>
     <h2 id="questionTitle">請點擊上方「顯示下一題」</h2>
     <div id="timerDisplay">15</div>
 
@@ -70,11 +73,20 @@
             lbContainer.innerHTML += `<p>第 ${index + 1} 名: ${player.name} (${player.score} 分)</p>`;
         });
     });
-    // === 新增：接收遊戲重置指令 ===
+// === 新增：重置確認與畫面更新 ===
+    function resetGame() {
+        // 多加一個確認視窗，避免主持人不小心誤觸
+        if (confirm('確定要重置遊戲嗎？這會把所有人的分數歸零，並回到第一題喔！')) {
+            socket.emit('resetGame');
+        }
+    }
+
     socket.on('gameReset', () => {
-        document.getElementById('statusMessage').innerText = '遊戲已重置！等待主持人開始...';
-        document.getElementById('statusMessage').style.display = 'block';
-        document.getElementById('optionsContainer').style.display = 'none';
+        // 隱藏結果、清空選項、畫面回到初始狀態
+        document.getElementById('results').classList.add('hidden');
+        document.getElementById('questionTitle').innerText = '遊戲已重置，請點擊「顯示下一題」';
+        document.getElementById('timerDisplay').innerText = '15';
+        document.getElementById('optionsContainer').innerHTML = '';
     });
     // ============================
 </script>
