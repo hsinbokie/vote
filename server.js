@@ -110,8 +110,7 @@ io.on('connection', (socket) => {
         delete players[socket.id];
         io.emit('updatePlayers', Object.keys(players).length);
     });
-});
-// === 新增：後台管理系統專用指令 ===
+    // === 新增：後台管理系統專用指令 ===
     
     // 1. 後台請求拿取所有題目
     socket.on('getAdminData', () => {
@@ -132,6 +131,8 @@ io.on('connection', (socket) => {
     });
     
     // ============================
+});
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`伺服器啟動: ${PORT}`);
