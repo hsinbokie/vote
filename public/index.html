@@ -88,6 +88,12 @@
         document.getElementById('optionsContainer').style.display = 'none';
     });
     // ============================
+    socket.on('showResults', () => {
+        // 時間到，手機畫面變回等待狀態
+        document.getElementById('statusMessage').innerText = '時間到！請看大螢幕排名！';
+        document.getElementById('statusMessage').style.display = 'block';
+        document.getElementById('optionsContainer').style.display = 'none';
+    });
 </script>
 </body>
 </html>
