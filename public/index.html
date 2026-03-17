@@ -71,6 +71,13 @@
         document.getElementById('statusMessage').style.display = 'block';
         document.getElementById('optionsContainer').style.display = 'none';
     });
+    // === 新增：接收遊戲重置指令 ===
+    socket.on('gameReset', () => {
+        document.getElementById('statusMessage').innerText = '遊戲已重置！等待主持人開始...';
+        document.getElementById('statusMessage').style.display = 'block';
+        document.getElementById('optionsContainer').style.display = 'none';
+    });
+    // ============================
 </script>
 </body>
 </html>
