@@ -46,7 +46,7 @@
     socket.on('loadQuestion', (question) => {
         document.getElementById('results').classList.add('hidden');
         document.getElementById('questionTitle').innerText = question.title;
-        document.getElementById('timerDisplay').innerText = '15';
+        document.getElementById('timerDisplay').innerText = '7';
         
         const container = document.getElementById('optionsContainer');
         container.innerHTML = `
