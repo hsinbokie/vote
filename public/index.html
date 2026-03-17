@@ -54,8 +54,18 @@
         document.getElementById('optionsContainer').style.display = 'none';
     }
 
+// 當收到題目時，直接進入搶答狀態
     socket.on('loadQuestion', () => {
-        document.getElementById('statusMessage').innerText = '請看大螢幕題目！等待計時開始...';
+        document.getElementById('statusMessage').style.display = 'none';
+        document.getElementById('optionsContainer').style.display = 'block';
+        document.querySelectorAll('#optionsContainer button').forEach(b => {
+            b.disabled = false; // 按鈕解鎖
+        });
+    });
+
+    // 接收遊戲重置指令
+    socket.on('gameReset', () => {
+        document.getElementById('statusMessage').innerText = '遊戲已重置！等待主持人開始...';
         document.getElementById('statusMessage').style.display = 'block';
         document.getElementById('optionsContainer').style.display = 'none';
     });
