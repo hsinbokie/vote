@@ -9,38 +9,45 @@ const io = new Server(server);
 app.use(express.static('public'));
 
 let players = {};
-let isQuestionActive = false; // 控制現在是否可以投票
-let timeLeft = 15; // 每題 15 秒
+let isQuestionActive = false;
+let timeLeft = 15;
 let timer;
 
-// 設定題目與正確答案
-let currentQuestion = {
-    title: "請問奇洋與彥翎的婚宴辦在哪一間飯店？",
-    options: { A: "君悅酒店", B: "W Hotel", C: "君品酒店", D: "萬豪酒店" },
-    answer: "C" // 正確答案
-};
+// 題庫設計 (可以無限往下加)
+let questions = [
+    { title: "請問奇洋與彥翎的婚宴辦在哪一間飯店？", options: { A: "君悅酒店", B: "W Hotel", C: "君品酒店", D: "萬豪酒店" }, answer: "C" },
+    { title: "新郎最喜歡吃哪一種食物？", options: { A: "火鍋", B: "拉麵", C: "牛排", D: "壽司" }, answer: "B" } // 請自行修改正確答案
+];
+let currentQuestionIndex = 0;
 
 io.on('connection', (socket) => {
     // 玩家加入
     socket.on('joinGame', (username) => {
         players[socket.id] = { name: username, score: 0, hasVoted: false };
         io.emit('updatePlayers', Object.keys(players).length);
-        socket.emit('loadQuestion', currentQuestion);
+        socket.emit('waitingForHost'); // 告訴玩家等待主持人出題
     });
 
-    // 任何人都可以點擊「開始遊戲」觸發計時
+    // 主持人發送下一題
+    socket.on('nextQuestion', () => {
+        if (currentQuestionIndex < questions.length) {
+            let q = questions[currentQuestionIndex];
+            io.emit('loadQuestion', { title: q.title, options: q.options });
+        } else {
+            io.emit('gameOver'); // 題目沒了，遊戲結束
+        }
+    });
+
+    // 主持人按下開始計時
     socket.on('startGame', () => {
-        if (isQuestionActive) return;
+        if (isQuestionActive || currentQuestionIndex >= questions.length) return;
         
         isQuestionActive = true;
         timeLeft = 15;
-        
-        // 重置所有人的投票狀態
         for (let id in players) players[id].hasVoted = false;
         
-        io.emit('gameStarted'); // 通知前端遊戲開始
+        io.emit('gameStarted');
 
-        // 開始倒數計時
         timer = setInterval(() => {
             timeLeft--;
             io.emit('timerUpdate', timeLeft);
@@ -49,26 +56,26 @@ io.on('connection', (socket) => {
                 clearInterval(timer);
                 isQuestionActive = false;
                 
-                // 時間到，計算排名並廣播結果
+                let q = questions[currentQuestionIndex];
                 let ranking = Object.values(players)
-                    .sort((a, b) => b.score - a.score) // 分數高的在前面
-                    .slice(0, 5); // 只取前 5 名
+                    .sort((a, b) => b.score - a.score)
+                    .slice(0, 5); // 取前五名
                 
-                io.emit('showResults', { answer: currentQuestion.answer, ranking: ranking });
+                io.emit('showResults', { answer: q.answer, ranking: ranking });
+                currentQuestionIndex++; // 準備進入下一題
             }
         }, 1000);
     });
 
-    // 處理投票與計分
+    // 玩家投票
     socket.on('submitVote', (option) => {
         let player = players[socket.id];
+        let q = questions[currentQuestionIndex];
         if (player && isQuestionActive && !player.hasVoted) {
             player.hasVoted = true;
-            
-            // 如果答對了，根據剩餘時間給分 (越快分數越高)
-            if (option === currentQuestion.answer) {
-                let timeBonus = timeLeft * 10; // 每剩1秒多10分
-                player.score += (100 + timeBonus); // 基礎分 100 + 速度加成
+            if (option === q.answer) {
+                let timeBonus = timeLeft * 10;
+                player.score += (100 + timeBonus);
             }
         }
     });
@@ -81,5 +88,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`伺服器已啟動，監聽 Port: ${PORT}`);
+    console.log(`伺服器啟動: ${PORT}`);
 });
