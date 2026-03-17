@@ -111,7 +111,27 @@ io.on('connection', (socket) => {
         io.emit('updatePlayers', Object.keys(players).length);
     });
 });
+// === 新增：後台管理系統專用指令 ===
+    
+    // 1. 後台請求拿取所有題目
+    socket.on('getAdminData', () => {
+        socket.emit('updateAdminData', questions);
+    });
 
+    // 2. 後台要求新增一題
+    socket.on('addQuestion', (newQ) => {
+        questions.push(newQ);
+        // 更新所有有打開後台網頁的畫面
+        io.emit('updateAdminData', questions); 
+    });
+
+    // 3. 後台要求刪除一題
+    socket.on('deleteQuestion', (index) => {
+        questions.splice(index, 1);
+        io.emit('updateAdminData', questions);
+    });
+    
+    // ============================
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`伺服器啟動: ${PORT}`);
