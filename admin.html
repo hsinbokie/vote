@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>遊戲後台管理系統</title>
+    <style>
+        body { font-family: sans-serif; background-color: #f4f7f6; padding: 30px; max-width: 800px; margin: 0 auto; }
+        .card { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 30px; }
+        h1, h2 { color: #333; }
+        input[type="text"], select { width: 100%; padding: 10px; margin: 8px 0 20px 0; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-size: 16px; }
+        button { background-color: #4CAF50; color: white; padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; width: 100%; }
+        button:hover { background-color: #45a049; }
+        .delete-btn { background-color: #f44336; padding: 8px 15px; width: auto; font-size: 14px; margin-top: 10px; }
+        .delete-btn:hover { background-color: #d32f2f; }
+        .question-item { border-bottom: 1px solid #eee; padding: 15px 0; }
+        .question-item:last-child { border-bottom: none; }
+    </style>
+</head>
+<body>
+
+    <h1>⚙️ 題目管理後台</h1>
+
+    <div class="card">
+        <h2>➕ 新增題目</h2>
+        <label>題目內容：</label>
+        <input type="text" id="qTitle" placeholder="例如：新郎第一次約會穿什麼顏色的衣服？">
+        
+        <label>選項 A：</label>
+        <input type="text" id="optA" placeholder="輸入選項 A">
+        <label>選項 B：</label>
+        <input type="text" id="optB" placeholder="輸入選項 B">
+        <label>選項 C：</label>
+        <input type="text" id="optC" placeholder="輸入選項 C">
+        <label>選項 D：</label>
+        <input type="text" id="optD" placeholder="輸入選項 D">
+        
+        <label>正確答案是：</label>
+        <select id="qAnswer">
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+            <option value="D">D</option>
+        </select>
+        
+        <button onclick="addQuestion()">儲存並新增題目</button>
+    </div>
+
+    <div class="card">
+        <h2>📝 目前題庫預覽</h2>
+        <div id="questionsList">
+            </div>
+    </div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const socket = io();
+
+    // 進入網頁時，立刻跟伺服器要目前的題目清單
+    socket.emit('getAdminData');
+
+    // 接收伺服器傳來的最新題目清單並更新畫面
+    socket.on('updateAdminData', (questions) => {
+        const list = document.getElementById('questionsList');
+        list.innerHTML = ''; // 先清空列表
+        
+        if(questions.length === 0) {
+            list.innerHTML = '<p style="color:#888;">目前沒有任何題目喔！</p>';
+            return;
+        }
+
+        questions.forEach((q, index) => {
+            list.innerHTML += `
+                <div class="question-item">
+                    <strong>第 ${index + 1} 題：${q.title}</strong><br>
+                    <span style="color:#666; font-size:14px;">
+                        A: ${q.options.A} | B: ${q.options.B} | C: ${q.options.C} | D: ${q.options.D}
+                    </span><br>
+                    <span style="color:#4CAF50; font-weight:bold;">正確答案：${q.answer}</span><br>
+                    <button class="delete-btn" onclick="deleteQuestion(${index})">刪除此題</button>
+                </div>
+            `;
+        });
+    });
+
+    // 點擊新增按鈕
+    function addQuestion() {
+        const title = document.getElementById('qTitle').value;
+        const optA = document.getElementById('optA').value;
+        const optB = document.getElementById('optB').value;
+        const optC = document.getElementById('optC').value;
+        const optD = document.getElementById('optD').value;
+        const answer = document.getElementById('qAnswer').value;
+
+        if(!title || !optA || !optB || !optC || !optD) {
+            alert('請把題目和四個選項都填寫完整喔！');
+            return;
+        }
+
+        const newQ = {
+            title: title,
+            options: { A: optA, B: optB, C: optC, D: optD },
+            answer: answer
+        };
+
+        socket.emit('addQuestion', newQ);
+        alert('新增成功！');
+        
+        // 清空輸入框
+        document.getElementById('qTitle').value = '';
+        document.getElementById('optA').value = '';
+        document.getElementById('optB').value = '';
+        document.getElementById('optC').value = '';
+        document.getElementById('optD').value = '';
+    }
+
+    // 點擊刪除按鈕
+    function deleteQuestion(index) {
+        if(confirm('確定要刪除這題嗎？')) {
+            socket.emit('deleteQuestion', index);
+        }
+    }
+</script>
+</body>
+</html>
