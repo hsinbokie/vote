@@ -37,7 +37,9 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-    const socket = io();
+const socket = io();
+    let clientStartTime = 0; // 新增：手機端專屬碼表
+
     function joinGame() {
         const user = document.getElementById('username').value;
         if (!user) return alert('請輸入名字！');
@@ -47,30 +49,22 @@
     }
     
     function vote(option) {
-        socket.emit('submitVote', option);
+        // 新增：按下按鈕的瞬間，計算精準反應時間 (毫秒)
+        let reactionTime = Date.now() - clientStartTime; 
+        
+        // 將答案和精準時間一起打包送給伺服器
+        socket.emit('submitVote', { option: option, reactionTime: reactionTime });
+        
         document.querySelectorAll('#optionsContainer button').forEach(b => b.disabled = true);
         document.getElementById('statusMessage').innerText = '已送出答案！等待開獎...';
         document.getElementById('statusMessage').style.display = 'block';
         document.getElementById('optionsContainer').style.display = 'none';
     }
 
-// 當收到題目時，直接進入搶答狀態
     socket.on('loadQuestion', () => {
-        document.getElementById('statusMessage').style.display = 'none';
-        document.getElementById('optionsContainer').style.display = 'block';
-        document.querySelectorAll('#optionsContainer button').forEach(b => {
-            b.disabled = false; // 按鈕解鎖
-        });
-    });
-
-    // 接收遊戲重置指令
-    socket.on('gameReset', () => {
-        document.getElementById('statusMessage').innerText = '遊戲已重置！等待主持人開始...';
-        document.getElementById('statusMessage').style.display = 'block';
-        document.getElementById('optionsContainer').style.display = 'none';
-    });
-
-    socket.on('gameStarted', () => {
+        // 新增：題目出現的瞬間，啟動手機端碼表
+        clientStartTime = Date.now(); 
+        
         document.getElementById('statusMessage').style.display = 'none';
         document.getElementById('optionsContainer').style.display = 'block';
         document.querySelectorAll('#optionsContainer button').forEach(b => b.disabled = false);
@@ -81,16 +75,9 @@
         document.getElementById('statusMessage').style.display = 'block';
         document.getElementById('optionsContainer').style.display = 'none';
     });
-    // === 新增：接收遊戲重置指令 ===
+
     socket.on('gameReset', () => {
         document.getElementById('statusMessage').innerText = '遊戲已重置！等待主持人開始...';
-        document.getElementById('statusMessage').style.display = 'block';
-        document.getElementById('optionsContainer').style.display = 'none';
-    });
-    // ============================
-    socket.on('showResults', () => {
-        // 時間到，手機畫面變回等待狀態
-        document.getElementById('statusMessage').innerText = '時間到！請看大螢幕排名！';
         document.getElementById('statusMessage').style.display = 'block';
         document.getElementById('optionsContainer').style.display = 'none';
     });
