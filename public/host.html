@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>大螢幕控制台</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; background-color: #f0f8ff; margin: 0; padding: 50px; }
+        #questionTitle { font-size: 50px; margin-bottom: 30px; }
+        .options { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; }
+        .opt-box { width: 40%; padding: 30px; font-size: 30px; border-radius: 10px; color: white; font-weight: bold; }
+        .bg-A { background-color: #e21b3c; } .bg-B { background-color: #1368ce; }
+        .bg-C { background-color: #d89e00; } .bg-D { background-color: #26890c; }
+        #timerDisplay { font-size: 80px; color: #ff5c5c; font-weight: bold; margin: 20px 0; }
+        .control-btn { padding: 15px 30px; font-size: 24px; cursor: pointer; background: #333; color: white; border: none; border-radius: 10px; margin: 10px; }
+        .hidden { display: none !important; }
+        #leaderboard { font-size: 30px; background: white; padding: 30px; border-radius: 15px; display: inline-block; text-align: left; }
+    </style>
+</head>
+<body>
+
+    <h1>主持人控制台 (目前連線人數: <span id="playerCount">0</span>)</h1>
+    
+    <button class="control-btn" onclick="socket.emit('nextQuestion')">顯示下一題</button>
+    <button class="control-btn" onclick="socket.emit('startGame')" style="background-color: #ff9800;">開始計時搶答！</button>
+
+    <h2 id="questionTitle">請點擊上方「顯示下一題」</h2>
+    <div id="timerDisplay">15</div>
+
+    <div class="options" id="optionsContainer">
+        </div>
+
+    <div id="results" class="hidden">
+        <h1 style="color: #4CAF50;">正確答案是：<span id="correctAnswer"></span></h1>
+        <div id="leaderboard"></div>
+    </div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const socket = io();
+
+    socket.on('updatePlayers', (count) => {
+        document.getElementById('playerCount').innerText = count;
+    });
+
+    socket.on('loadQuestion', (question) => {
+        document.getElementById('results').classList.add('hidden');
+        document.getElementById('questionTitle').innerText = question.title;
+        document.getElementById('timerDisplay').innerText = '15';
+        
+        const container = document.getElementById('optionsContainer');
+        container.innerHTML = `
+            <div class="opt-box bg-A">A: ${question.options.A}</div>
+            <div class="opt-box bg-B">B: ${question.options.B}</div>
+            <div class="opt-box bg-C">C: ${question.options.C}</div>
+            <div class="opt-box bg-D">D: ${question.options.D}</div>
+        `;
+    });
+
+    socket.on('timerUpdate', (time) => {
+        document.getElementById('timerDisplay').innerText = time;
+    });
+
+    socket.on('showResults', (data) => {
+        document.getElementById('results').classList.remove('hidden');
+        document.getElementById('correctAnswer').innerText = data.answer;
+        
+        const lbContainer = document.getElementById('leaderboard');
+        lbContainer.innerHTML = '<h3>🏆 速度最快排行榜 🏆</h3>';
+        data.ranking.forEach((player, index) => {
+            lbContainer.innerHTML += `<p>第 ${index + 1} 名: ${player.name} (${player.score} 分)</p>`;
+        });
+    });
+</script>
+</body>
+</html>
