@@ -3,39 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>迷你 Kahoot 投票遊戲</title>
+    <title>互動問答遊戲</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background-color: #f2f2f2; padding: 20px; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        body { font-family: sans-serif; text-align: center; background-color: #f0f8ff; padding: 20px; }
+        .container { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
         .hidden { display: none; }
-        button { padding: 10px 20px; font-size: 16px; margin: 10px; cursor: pointer; border: none; border-radius: 5px; background-color: #4CAF50; color: white; }
-        button:hover { background-color: #45a049; }
-        .option-btn { display: block; width: 100%; margin: 10px 0; background-color: #2196F3; font-size: 18px; padding: 15px; }
-        input { padding: 10px; font-size: 16px; width: 80%; margin-bottom: 20px; }
-        #results { margin-top: 20px; text-align: left; }
+        button { padding: 12px 20px; font-size: 18px; margin: 10px; cursor: pointer; border: none; border-radius: 8px; background-color: #ff5c5c; color: white; width: 100%; font-weight: bold; }
+        button:hover { background-color: #ff4040; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        #timerDisplay { font-size: 40px; color: #ff5c5c; font-weight: bold; margin: 15px 0; }
+        input { padding: 12px; font-size: 16px; width: 80%; margin-bottom: 20px; border: 2px solid #ddd; border-radius: 8px; }
+        .leaderboard-item { font-size: 20px; padding: 10px; background: #fff3cd; margin: 5px 0; border-radius: 5px; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div id="loginSection">
-        <h2>加入遊戲</h2>
-        <input type="text" id="usernameInput" placeholder="請輸入你的暱稱">
-        <button onclick="joinGame()">進入房間</button>
+        <h2>輸入暱稱進入房間</h2>
+        <input type="text" id="usernameInput" placeholder="你的名字...">
+        <button onclick="joinGame()" style="background-color: #4CAF50;">進入遊戲</button>
     </div>
 
     <div id="gameSection" class="hidden">
-        <p>目前線上人數: <span id="playerCount">0</span></p>
+        <p>線上人數: <span id="playerCount">0</span></p>
+        <button id="startBtn" onclick="startGame()" style="background-color: #ff9800;">🚀 開始本題計時</button>
+        
         <h2 id="questionTitle">等待題目中...</h2>
-        <div id="optionsContainer">
-            </div>
+        <div id="timerDisplay">15</div>
+        
+        <div id="optionsContainer"></div>
 
-        <div id="results">
-            <h3>即時投票結果：</h3>
-            <p>A: <span id="resA">0</span> 票</p>
-            <p>B: <span id="resB">0</span> 票</p>
-            <p>C: <span id="resC">0</span> 票</p>
-            <p>D: <span id="resD">0</span> 票</p>
+        <div id="results" class="hidden">
+            <h2 style="color: #4CAF50;">時間到！</h2>
+            <h3>正確答案是: <span id="correctAnswer"></span></h3>
+            <hr>
+            <h3>🏆 速度最快排行榜 🏆</h3>
+            <div id="leaderboard"></div>
         </div>
     </div>
 </div>
@@ -44,52 +48,69 @@
 <script>
     const socket = io();
 
-    // 登入遊戲
     function joinGame() {
         const username = document.getElementById('usernameInput').value;
-        if (username.trim() === '') {
-            alert('請輸入暱稱！');
-            return;
-        }
+        if (!username) return alert('請輸入暱稱！');
         socket.emit('joinGame', username);
-        
-        // 切換畫面
         document.getElementById('loginSection').style.display = 'none';
         document.getElementById('gameSection').style.display = 'block';
     }
 
-    // 接收題目
+    function startGame() {
+        socket.emit('startGame');
+        document.getElementById('startBtn').style.display = 'none';
+    }
+
+    // 載入題目按鈕
     socket.on('loadQuestion', (question) => {
         document.getElementById('questionTitle').innerText = question.title;
         const container = document.getElementById('optionsContainer');
         container.innerHTML = ''; 
-        
-        // 產生 A, B, C, D 按鈕
         for (const [key, value] of Object.entries(question.options)) {
             const btn = document.createElement('button');
             btn.className = 'option-btn';
             btn.innerText = `${key}: ${value}`;
             btn.onclick = () => {
                 socket.emit('submitVote', key);
-                // 投完票後將所有按鈕設為不可點擊
                 document.querySelectorAll('.option-btn').forEach(b => b.disabled = true);
-                btn.innerText += ' (已選擇)';
+                btn.innerText += ' (已鎖定)';
+                btn.style.backgroundColor = '#4CAF50';
             };
             container.appendChild(btn);
         }
     });
 
-    // 更新線上人數
-    socket.on('updatePlayers', (count) => {
-        document.getElementById('playerCount').innerText = count;
+    // 更新倒數計時
+    socket.on('timerUpdate', (time) => {
+        document.getElementById('timerDisplay').innerText = time;
     });
 
-    // 即時更新結果票數
-    socket.on('updateResults', (votes) => {
-        document.getElementById('resA').innerText = votes.A;
-        document.getElementById('resB').innerText = votes.B;
-        document.getElementById('resC').innerText = votes.C;
-        document.getElementById('resD').innerText = votes.D;
+    // 遊戲開始，隱藏排行榜
+    socket.on('gameStarted', () => {
+        document.getElementById('results').style.display = 'none';
+        document.getElementById('startBtn').style.display = 'none';
+        document.querySelectorAll('.option-btn').forEach(b => {
+            b.disabled = false;
+            b.style.backgroundColor = '#ff5c5c';
+            b.innerText = b.innerText.replace(' (已鎖定)', '');
+        });
+    });
+
+    // 時間到，顯示結果與排名
+    socket.on('showResults', (data) => {
+        document.querySelectorAll('.option-btn').forEach(b => b.disabled = true);
+        document.getElementById('results').style.display = 'block';
+        document.getElementById('correctAnswer').innerText = data.answer;
+        
+        const lbContainer = document.getElementById('leaderboard');
+        lbContainer.innerHTML = '';
+        data.ranking.forEach((player, index) => {
+            lbContainer.innerHTML += `<div class="leaderboard-item">第 ${index + 1} 名: ${player.name} (${player.score} 分)</div>`;
+        });
+    });
+
+    socket.on('updatePlayers', (count) => {
+        document.getElementById('playerCount').innerText = count;
     });
 </script>
 
