@@ -27,59 +27,60 @@ io.on('connection', (socket) => {
         io.emit('updatePlayers', Object.keys(players).length);
         socket.emit('waitingForHost'); // 告訴玩家等待主持人出題
     });
-// === 替換成這個全新的出題與計時邏輯 ===
+// === 替換全新的出題與毫秒計分邏輯 ===
+    let questionStartTime = 0;
+    const TIME_LIMIT = 5000; // 5秒 = 5000毫秒
+
     socket.on('nextQuestion', () => {
-        // 如果還在倒數中，避免主持人不小心連按
         if (isQuestionActive) return; 
 
         if (currentQuestionIndex < questions.length) {
             let q = questions[currentQuestionIndex];
             
-            // 進入答題狀態，設定為 5 秒
             isQuestionActive = true;
-            timeLeft = 5; 
             for (let id in players) players[id].hasVoted = false;
 
-            // 同時發送題目給大螢幕，並通知所有人「遊戲開始」
+            // 記錄這題開始的精準毫秒時間
+            questionStartTime = Date.now(); 
+            
+            // 發送題目給大螢幕，並通知手機端「遊戲開始」
             io.emit('loadQuestion', { title: q.title, options: q.options });
-            io.emit('gameStarted'); 
 
-            // 啟動 5 秒倒數計時器
-            timer = setInterval(() => {
-                timeLeft--;
-                io.emit('timerUpdate', timeLeft);
-
-                if (timeLeft <= 0) {
-                    clearInterval(timer);
-                    isQuestionActive = false;
-                    
-                    // 時間到，計算排名並廣播結果
-                    let ranking = Object.values(players)
-                        .sort((a, b) => b.score - a.score)
-                        .slice(0, 5); 
-                    
-                    io.emit('showResults', { answer: q.answer, ranking: ranking });
-                    currentQuestionIndex++; // 準備進入下一題
-                }
-            }, 1000);
+            // 後端精準等待 5 秒後，自動結算這題並關閉作答
+            setTimeout(() => {
+                isQuestionActive = false;
+                
+                let ranking = Object.values(players)
+                    .sort((a, b) => b.score - a.score)
+                    .slice(0, 5); 
+                
+                // 廣播結果，讓大螢幕切換到「排名頁面」
+                io.emit('showResults', { answer: q.answer, ranking: ranking });
+                currentQuestionIndex++; // 準備好下一題的進度
+            }, TIME_LIMIT);
         } else {
-            io.emit('gameOver'); // 題目沒了
+            io.emit('gameOver'); 
         }
     });
-    // ============================
-  
-    // 玩家投票
+
     socket.on('submitVote', (option) => {
         let player = players[socket.id];
         let q = questions[currentQuestionIndex];
+        
         if (player && isQuestionActive && !player.hasVoted) {
             player.hasVoted = true;
             if (option === q.answer) {
-                let timeBonus = timeLeft * 10;
-                player.score += (100 + timeBonus);
+                // 計算玩家花了多少毫秒才作答
+                let timeTaken = Date.now() - questionStartTime; 
+                // 剩餘的時間直接變成加分 (最高 5000 分)
+                let timeBonus = Math.max(0, TIME_LIMIT - timeTaken); 
+                
+                // 基礎分 1000 + 速度毫秒加分
+                player.score += (1000 + timeBonus); 
             }
         }
     });
+    // ============================
 // === 新增：主持人重置遊戲 ===
     socket.on('resetGame', () => {
         // 1. 題目回到第一題
