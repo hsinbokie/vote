@@ -63,23 +63,28 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('submitVote', (option) => {
+   // === 替換成接收手機端精準時間的計分邏輯 ===
+    socket.on('submitVote', (data) => {
         let player = players[socket.id];
         let q = questions[currentQuestionIndex];
         
         if (player && isQuestionActive && !player.hasVoted) {
             player.hasVoted = true;
-            if (option === q.answer) {
-                // 計算玩家花了多少毫秒才作答
-                let timeTaken = Date.now() - questionStartTime; 
-                // 剩餘的時間直接變成加分 (最高 5000 分)
-                let timeBonus = Math.max(0, TIME_LIMIT - timeTaken); 
+            
+            // 注意：現在傳進來的是一個物件 data，包含 option 和 reactionTime
+            if (data.option === q.answer) {
+                // 為了防止有人破解網頁作弊，我們設定反應時間最少為 0，最多為 TIME_LIMIT (5000)
+                let validReactionTime = Math.min(Math.max(0, data.reactionTime), TIME_LIMIT);
                 
-                // 基礎分 1000 + 速度毫秒加分
+                // 剩餘時間直接轉為紅利分數 (最高 5000 分)
+                let timeBonus = TIME_LIMIT - validReactionTime; 
+                
+                // 基礎分 1000 + 速度紅利
                 player.score += (1000 + timeBonus); 
             }
         }
     });
+    // ============================
     // ============================
 // === 新增：主持人重置遊戲 ===
     socket.on('resetGame', () => {
