@@ -79,7 +79,24 @@ io.on('connection', (socket) => {
             }
         }
     });
-
+// === 新增：主持人重置遊戲 ===
+    socket.on('resetGame', () => {
+        // 1. 題目回到第一題
+        currentQuestionIndex = 0;
+        // 2. 停止目前的計時器（如果有在跑的話）
+        isQuestionActive = false;
+        clearInterval(timer); 
+        
+        // 3. 把所有線上玩家的分數和投票狀態歸零
+        for (let id in players) {
+            players[id].score = 0;
+            players[id].hasVoted = false;
+        }
+        
+        // 4. 廣播給所有人：遊戲已經重置！
+        io.emit('gameReset');
+    });
+    // ============================
     socket.on('disconnect', () => {
         delete players[socket.id];
         io.emit('updatePlayers', Object.keys(players).length);
